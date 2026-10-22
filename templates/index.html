@@ -753,6 +753,94 @@
             color: var(--loading-text);
         }
 
+        .workflow-progress {
+            margin: 0 0 16px;
+            padding: 16px;
+            border: 1px solid var(--result-border);
+            border-radius: 10px;
+            background: var(--result-surface);
+        }
+
+        .workflow-progress[hidden],
+        .workflow-progress-message[hidden] {
+            display: none;
+        }
+
+        .workflow-progress h3 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+        }
+
+        .workflow-stage-list {
+            display: grid;
+            gap: 9px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .workflow-stage {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border: 1px solid var(--result-border);
+            border-radius: 8px;
+            background: var(--surface);
+        }
+
+        .workflow-stage-copy {
+            min-width: 0;
+        }
+
+        .workflow-stage-name {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 650;
+        }
+
+        .workflow-stage-events {
+            display: block;
+            margin-top: 2px;
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
+        .workflow-stage-status {
+            flex: 0 0 auto;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: var(--blue-soft);
+            color: var(--loading-text);
+            font-size: 0.76rem;
+            font-weight: 650;
+        }
+
+        .workflow-stage-status[data-state="running"] {
+            color: var(--blue);
+        }
+
+        .workflow-stage-status[data-state="completed"] {
+            background: var(--disclaimer-surface);
+            color: var(--teal);
+        }
+
+        .workflow-stage-status[data-state="failed"] {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+
+        .workflow-progress-message {
+            margin: 12px 0 0;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .workflow-progress-message[data-state="error"] {
+            color: var(--danger);
+        }
+
         .spinner {
             width: 17px;
             height: 17px;
@@ -1007,6 +1095,40 @@
                 <span class="spinner" aria-hidden="true"></span>
                 <span>Reviewing your information. Please wait…</span>
             </p>
+            <section id="workflowProgress" class="workflow-progress" aria-labelledby="workflow-progress-title" hidden>
+                <h3 id="workflow-progress-title">Workflow Progress</h3>
+                <ol id="workflowProgressList" class="workflow-stage-list" aria-live="polite" aria-relevant="text">
+                    <li class="workflow-stage" data-stage="symptom_analysis">
+                        <span class="workflow-stage-copy">
+                            <span class="workflow-stage-name">Symptom analysis</span>
+                            <span class="workflow-stage-events">Agent: pending · Task: pending</span>
+                        </span>
+                        <span class="workflow-stage-status" data-state="pending">Pending</span>
+                    </li>
+                    <li class="workflow-stage" data-stage="test_interpretation">
+                        <span class="workflow-stage-copy">
+                            <span class="workflow-stage-name">Test result interpretation</span>
+                            <span class="workflow-stage-events">Agent: pending · Task: pending</span>
+                        </span>
+                        <span class="workflow-stage-status" data-state="pending">Pending</span>
+                    </li>
+                    <li class="workflow-stage" data-stage="possible_conditions_review">
+                        <span class="workflow-stage-copy">
+                            <span class="workflow-stage-name">Possible conditions review</span>
+                            <span class="workflow-stage-events">Agent: pending · Task: pending</span>
+                        </span>
+                        <span class="workflow-stage-status" data-state="pending">Pending</span>
+                    </li>
+                    <li class="workflow-stage" data-stage="care_guidance">
+                        <span class="workflow-stage-copy">
+                            <span class="workflow-stage-name">Care guidance</span>
+                            <span class="workflow-stage-events">Agent: pending · Task: pending</span>
+                        </span>
+                        <span class="workflow-stage-status" data-state="pending">Pending</span>
+                    </li>
+                </ol>
+                <p id="workflowProgressMessage" class="workflow-progress-message" role="status" aria-live="polite" hidden></p>
+            </section>
             <p id="errorMessage" class="error-message" role="alert" hidden></p>
             <div id="resultContent" class="result-content" hidden></div>
             <div id="resultActions" class="result-actions" hidden>
@@ -1073,6 +1195,9 @@
         const buttonLabel = document.getElementById('buttonLabel');
         const resultContainer = document.getElementById('result');
         const loadingMessage = document.getElementById('loadingMessage');
+        const workflowProgress = document.getElementById('workflowProgress');
+        const workflowProgressList = document.getElementById('workflowProgressList');
+        const workflowProgressMessage = document.getElementById('workflowProgressMessage');
         const errorMessage = document.getElementById('errorMessage');
         const resultContent = document.getElementById('resultContent');
         const resultActions = document.getElementById('resultActions');
@@ -1095,6 +1220,15 @@
         const historyStorageKey = 'mediassist-recent-analyses';
         const maxSymptomsLength = Number(symptomsInput.dataset.maxLength);
         const maxTestResultsLength = Number(testResultsInput.dataset.maxLength);
+        const workflowStages = {
+            symptom_analysis: { role: 'Symptom Analyst' },
+            test_interpretation: { role: 'Test Result Interpreter' },
+            possible_conditions_review: { role: 'Possible Conditions Reviewer' },
+            care_guidance: { role: 'Care Guidance Assistant' },
+        };
+        const workflowEventStatuses = ['started', 'completed', 'failed'];
+        const workflowDisplayStatuses = ['pending', 'running', 'completed', 'failed'];
+        let workflowStageStates = {};
         let analyses = loadAnalyses();
         let currentAnalysis = null;
         let isSubmitting = false;
@@ -1160,6 +1294,159 @@
                 }).filter(Boolean).join(' ');
             }
             return 'The analysis could not be completed. Please try again.';
+        }
+
+        function resetWorkflowProgress() {
+            workflowStageStates = Object.fromEntries(
+                Object.keys(workflowStages).map((stageId) => [
+                    stageId,
+                    { agent: 'pending', task: 'pending' },
+                ]),
+            );
+            workflowProgressList.querySelectorAll('[data-stage]').forEach((stageElement) => {
+                const stageId = stageElement.dataset.stage;
+                const state = workflowStageStates[stageId];
+                stageElement.querySelector('.workflow-stage-events').textContent =
+                    `Agent: ${state.agent} · Task: ${state.task}`;
+                const statusElement = stageElement.querySelector('.workflow-stage-status');
+                statusElement.textContent = 'Pending';
+                statusElement.dataset.state = 'pending';
+            });
+            workflowProgressMessage.textContent = '';
+            workflowProgressMessage.dataset.state = '';
+            workflowProgressMessage.hidden = true;
+        }
+
+        function updateWorkflowStage(eventData) {
+            const stage = workflowStages[eventData.stage_id];
+            if (
+                !stage
+                || eventData.role !== stage.role
+                || !['agent', 'task'].includes(eventData.component)
+                || !workflowEventStatuses.includes(eventData.status)
+            ) {
+                return;
+            }
+
+            const eventStatus = eventData.status === 'started' ? 'running' : eventData.status;
+            workflowStageStates[eventData.stage_id][eventData.component] = eventStatus;
+
+            const stageElement = workflowProgressList.querySelector(
+                `[data-stage="${eventData.stage_id}"]`,
+            );
+            if (!stageElement) return;
+
+            const state = workflowStageStates[eventData.stage_id];
+            let stageStatus = 'pending';
+            if (state.task === 'failed' || state.agent === 'failed') {
+                stageStatus = 'failed';
+            } else if (state.task === 'completed') {
+                stageStatus = 'completed';
+            } else if (
+                state.task === 'running'
+                || state.agent === 'running'
+                || state.agent === 'completed'
+            ) {
+                stageStatus = 'running';
+            }
+
+            const statusElement = stageElement.querySelector('.workflow-stage-status');
+            statusElement.textContent =
+                stageStatus.charAt(0).toUpperCase() + stageStatus.slice(1);
+            statusElement.dataset.state = stageStatus;
+            stageElement.querySelector('.workflow-stage-events').textContent =
+                `Agent: ${state.agent} · Task: ${state.task}`;
+        }
+
+        async function readAnalysisProgress(response) {
+            if (!response.body) {
+                throw new Error('Live workflow progress is unavailable in this browser.');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let requestId = null;
+            let terminalEvent = null;
+
+            function processFrame(frame) {
+                let eventName = '';
+                const dataLines = [];
+                for (const line of frame.split('\n')) {
+                    const normalizedLine = line.endsWith('\r') ? line.slice(0, -1) : line;
+                    if (normalizedLine.startsWith('event:')) {
+                        eventName = normalizedLine.slice(6).trim();
+                    } else if (normalizedLine.startsWith('data:')) {
+                        dataLines.push(normalizedLine.slice(5).trimStart());
+                    }
+                }
+                if (!eventName || dataLines.length === 0) return;
+
+                let eventData;
+                try {
+                    eventData = JSON.parse(dataLines.join('\n'));
+                } catch (error) {
+                    throw new Error('The workflow progress stream returned an invalid event.');
+                }
+                if (!eventData || typeof eventData !== 'object') {
+                    throw new Error('The workflow progress stream returned an invalid event.');
+                }
+
+                if (eventName === 'started') {
+                    if (typeof eventData.request_id !== 'string' || eventData.request_id.length === 0) {
+                        throw new Error('The workflow progress stream did not identify this analysis.');
+                    }
+                    if (requestId && eventData.request_id !== requestId) {
+                        throw new Error('The workflow progress stream changed analysis requests unexpectedly.');
+                    }
+                    requestId = eventData.request_id;
+                    return;
+                }
+
+                if (!requestId || eventData.request_id !== requestId) return;
+
+                if (eventName === 'progress') {
+                    updateWorkflowStage(eventData);
+                } else if (eventName === 'result' && typeof eventData.result === 'string') {
+                    terminalEvent = { type: 'result', result: eventData.result };
+                } else if (eventName === 'failed') {
+                    terminalEvent = { type: 'failed' };
+                    workflowProgressMessage.textContent =
+                        'Analysis failed. Stage statuses show the events received before failure.';
+                    workflowProgressMessage.dataset.state = 'error';
+                    workflowProgressMessage.hidden = false;
+                }
+            }
+
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    buffer += decoder.decode(value, { stream: !done });
+                    buffer = buffer.replace(/\r\n/g, '\n');
+
+                    let frameEnd = buffer.indexOf('\n\n');
+                    while (frameEnd !== -1) {
+                        processFrame(buffer.slice(0, frameEnd));
+                        buffer = buffer.slice(frameEnd + 2);
+                        frameEnd = buffer.indexOf('\n\n');
+                    }
+
+                    if (done) {
+                        if (buffer.trim()) processFrame(buffer);
+                        break;
+                    }
+                }
+            } finally {
+                reader.releaseLock();
+            }
+
+            if (!terminalEvent) {
+                throw new Error('The workflow progress connection ended before the analysis finished.');
+            }
+            if (terminalEvent.type === 'failed') {
+                throw new Error('The analysis could not be completed. Please try again later.');
+            }
+            return terminalEvent.result;
         }
 
         function loadAnalyses() {
@@ -1440,6 +1727,8 @@
         }
 
         historyList.addEventListener('click', (event) => {
+            if (isSubmitting) return;
+
             const button = event.target.closest('button[data-action]');
             if (!button) return;
 
@@ -1463,6 +1752,7 @@
             currentAnalysis = analysis;
             renderMarkdownResult(analysis.response, resultContent);
             loadingMessage.hidden = true;
+            workflowProgress.hidden = true;
             errorMessage.hidden = true;
             resultContent.hidden = false;
             resultActions.hidden = false;
@@ -1528,9 +1818,11 @@
             resultSubtitle.textContent = 'Review this information with a qualified healthcare professional.';
             errorMessage.textContent = '';
             resultContent.textContent = '';
+            resetWorkflowProgress();
+            workflowProgress.hidden = false;
 
             try {
-                const response = await fetch('/api/analyze', {
+                const response = await fetch('/api/analyze/progress', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1541,16 +1833,22 @@
                     }),
                 });
 
-                const data = await response.json();
                 if (!response.ok) {
-                    throw new Error(getApiErrorMessage(data.detail));
+                    let detail;
+                    try {
+                        detail = (await response.json()).detail;
+                    } catch (parseError) {
+                        detail = null;
+                    }
+                    throw new Error(getApiErrorMessage(detail));
                 }
 
-                if (typeof data.result !== 'string') {
+                const analysisResponse = await readAnalysisProgress(response);
+                if (typeof analysisResponse !== 'string') {
                     throw new Error('The response did not include a readable result. Please try again.');
                 }
 
-                renderMarkdownResult(data.result, resultContent);
+                renderMarkdownResult(analysisResponse, resultContent);
                 resultContent.hidden = false;
                 resultActions.hidden = false;
                 resultSubtitle.textContent = 'Review this information with a qualified healthcare professional.';
@@ -1560,12 +1858,19 @@
                         : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
                     symptoms: submittedSymptoms,
                     testResults: submittedTestResults,
-                    response: data.result,
+                    response: analysisResponse,
                     timestamp: new Date().toISOString(),
                 };
                 currentAnalysis = analysis;
                 saveAnalyses([analysis, ...analyses], 'Analysis saved to recent history.');
             } catch (error) {
+                workflowProgressMessage.textContent =
+                    error instanceof Error
+                        && error.message === 'The analysis could not be completed. Please try again later.'
+                        ? 'Analysis failed. Stage statuses show the events received before failure.'
+                        : 'Live workflow progress was interrupted. Stage statuses show the events received; the analysis was not marked complete.';
+                workflowProgressMessage.dataset.state = 'error';
+                workflowProgressMessage.hidden = false;
                 errorMessage.textContent = error instanceof Error
                     ? `Unable to complete the analysis: ${error.message}`
                     : 'Unable to complete the analysis. Please check your connection and try again.';
