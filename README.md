@@ -3,6 +3,11 @@
 MediAssist AI is an educational health-information web app. It combines a sequential CrewAI workflow with a browser interface to help users organize reported symptoms and test results for discussion with a qualified healthcare professional.
 
 > This app does not diagnose or replace professional medical care.
+<img width="941" height="494" alt="image" src="https://github.com/user-attachments/assets/f86020f3-4054-4d52-aca6-cddca371c373" />
+<img width="908" height="432" alt="image" src="https://github.com/user-attachments/assets/80ba31da-4e89-436e-b484-c31b94eecc43" />
+<img width="916" height="488" alt="image" src="https://github.com/user-attachments/assets/112ad0d3-0e4f-477f-9ba3-32ccacb0f01c" />
+<img width="787" height="266" alt="image" src="https://github.com/user-attachments/assets/7b770b48-3b7f-4308-84f5-c59d7fb07806" />
+
 
 ## Features
 
