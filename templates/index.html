@@ -311,6 +311,19 @@
             display: none;
         }
 
+        .character-counter {
+            display: block;
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-align: right;
+        }
+
+        .character-counter[data-limit-reached="true"] {
+            color: var(--danger);
+            font-weight: 650;
+        }
+
         textarea {
             display: block;
             width: 100%;
@@ -909,11 +922,12 @@
                             rows="5"
                             data-max-length="{{ max_symptoms_length }}"
                             placeholder="Describe what you’re experiencing, when it started, how often it happens, and anything that makes it better or worse."
-                            aria-describedby="symptoms-hint symptoms-error"
+                            aria-describedby="symptoms-hint symptoms-error symptoms-counter"
                             required
                         ></textarea>
                         <span id="symptoms-hint" class="field-hint">Maximum {{ max_symptoms_length }} characters. Avoid including your name or other personal identifying details.</span>
                         <p id="symptoms-error" class="field-error" role="alert" hidden></p>
+                        <span id="symptoms-counter" class="character-counter" aria-live="polite" aria-atomic="true"></span>
                     </div>
 
                     <div class="form-group">
@@ -927,9 +941,10 @@
                             rows="4"
                             data-max-length="{{ max_test_results_length }}"
                             placeholder="Add relevant lab values, measurements, or report text, including units and reference ranges when available."
-                            aria-describedby="test-results-error"
+                            aria-describedby="test-results-error test-results-counter"
                         ></textarea>
                         <p id="test-results-error" class="field-error" role="alert" hidden></p>
+                        <span id="test-results-counter" class="character-counter" aria-live="polite" aria-atomic="true"></span>
                     </div>
 
                     <div class="demo-example">
@@ -1070,6 +1085,8 @@
         const testResultsInput = document.getElementById('testResults');
         const symptomsError = document.getElementById('symptoms-error');
         const testResultsError = document.getElementById('test-results-error');
+        const symptomsCounter = document.getElementById('symptoms-counter');
+        const testResultsCounter = document.getElementById('test-results-counter');
         const loadDemoButton = document.getElementById('loadDemoButton');
         const historyList = document.getElementById('historyList');
         const historyEmpty = document.getElementById('historyEmpty');
@@ -1116,12 +1133,22 @@
             return message;
         }
 
+        function updateCharacterCounter(input, counter, maxLength) {
+            const characterCount = Array.from(input.value).length;
+            counter.textContent = `${characterCount.toLocaleString()} / ${maxLength.toLocaleString()} characters`;
+            counter.dataset.limitReached = String(characterCount >= maxLength);
+        }
+
         symptomsInput.addEventListener('input', () => {
             updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
+            updateCharacterCounter(symptomsInput, symptomsCounter, maxSymptomsLength);
         });
         testResultsInput.addEventListener('input', () => {
             updateFieldError(testResultsInput, testResultsError, maxTestResultsLength, 'Test results', false);
+            updateCharacterCounter(testResultsInput, testResultsCounter, maxTestResultsLength);
         });
+        updateCharacterCounter(symptomsInput, symptomsCounter, maxSymptomsLength);
+        updateCharacterCounter(testResultsInput, testResultsCounter, maxTestResultsLength);
 
         function getApiErrorMessage(detail) {
             if (typeof detail === 'string') return detail;
@@ -1313,6 +1340,8 @@
             testResultsInput.value = 'Fictional demo values only: temperature 36.8 °C; sample result A: 4.2 units (example reference interval 3.5–5.0 units). These values are invented and are not from a real person or medical case.';
             updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
             updateFieldError(testResultsInput, testResultsError, maxTestResultsLength, 'Test results', false);
+            updateCharacterCounter(symptomsInput, symptomsCounter, maxSymptomsLength);
+            updateCharacterCounter(testResultsInput, testResultsCounter, maxTestResultsLength);
             symptomsInput.focus();
         });
 
@@ -1429,6 +1458,8 @@
             testResultsInput.value = analysis.testResults;
             updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
             updateFieldError(testResultsInput, testResultsError, maxTestResultsLength, 'Test results', false);
+            updateCharacterCounter(symptomsInput, symptomsCounter, maxSymptomsLength);
+            updateCharacterCounter(testResultsInput, testResultsCounter, maxTestResultsLength);
             currentAnalysis = analysis;
             renderMarkdownResult(analysis.response, resultContent);
             loadingMessage.hidden = true;
