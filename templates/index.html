@@ -466,6 +466,153 @@
             color: var(--disclaimer-text);
         }
 
+        .comparison-card {
+            margin-top: 22px;
+            padding: clamp(22px, 4vw, 32px);
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .report-panel {
+            min-width: 0;
+            margin: 0;
+            padding: 18px;
+            border: 1px solid var(--result-border);
+            border-radius: 14px;
+            background: var(--result-surface);
+        }
+
+        .report-panel h3 {
+            margin: 0 0 16px;
+            font-size: 1rem;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            clip-path: inset(50%);
+        }
+
+        .comparison-field {
+            margin-bottom: 15px;
+        }
+
+        .comparison-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .comparison-field label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.86rem;
+        }
+
+        .comparison-field input {
+            display: block;
+            width: 100%;
+            min-height: 44px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            outline: none;
+            background: var(--field-surface);
+            color: var(--ink);
+            font: inherit;
+            font-size: 0.92rem;
+        }
+
+        .comparison-field input:focus-visible {
+            border-color: var(--blue);
+            background: var(--surface);
+            box-shadow: 0 0 0 4px var(--focus-ring);
+        }
+
+        .comparison-field input::placeholder {
+            color: var(--placeholder);
+        }
+
+        .comparison-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .comparison-note {
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .comparison-result {
+            margin: 16px 0 0;
+            padding: 13px 15px;
+            border: 1px solid var(--disclaimer-border);
+            border-radius: 10px;
+            background: var(--disclaimer-surface);
+            color: var(--disclaimer-text);
+            font-size: 0.9rem;
+        }
+
+        .comparison-result[hidden] {
+            display: none;
+        }
+
+        .comparison-result h3 {
+            margin: 0 0 8px;
+            color: var(--ink);
+            font-size: 1rem;
+        }
+
+        .comparison-result p {
+            margin: 8px 0 0;
+        }
+
+        .comparison-table-wrap {
+            margin-top: 12px;
+            overflow-x: auto;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            color: var(--ink);
+            font-size: 0.85rem;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 9px 10px;
+            border: 1px solid var(--result-border);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .comparison-table th {
+            background: var(--blue-soft);
+            font-weight: 700;
+        }
+
+        .comparison-changes {
+            margin: 14px 0 0;
+            padding-left: 1.25rem;
+            color: var(--ink);
+        }
+
+        .comparison-disclaimer {
+            margin-top: 12px !important;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
         .result-card {
             margin-top: 22px;
             padding: clamp(22px, 4vw, 32px);
@@ -879,6 +1026,10 @@
             .side-column {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
+
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 520px) {
@@ -1079,6 +1230,80 @@
             </aside>
         </div>
 
+        <section class="card comparison-card" aria-labelledby="comparison-title">
+            <div class="section-heading">
+                <span class="heading-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path d="M4 6h16M4 12h10M4 18h16M17 9l3 3-3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                <div>
+                    <h2 id="comparison-title">Medical Report Comparison</h2>
+                    <p>Compare matching test names and units across two report dates.</p>
+                </div>
+            </div>
+
+            <form id="comparisonForm">
+                <div class="comparison-grid">
+                    <fieldset class="report-panel">
+                        <legend class="visually-hidden">Previous Report</legend>
+                        <h3 aria-hidden="true">Previous Report</h3>
+                        <div class="comparison-field">
+                            <label for="previousReportDate">Report date</label>
+                            <input type="date" id="previousReportDate" name="previous_report_date" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="previousTestName">Test name</label>
+                            <input type="text" id="previousTestName" name="previous_test_name" maxlength="100" autocomplete="off" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="previousTestValue">Numeric test value</label>
+                            <input type="number" id="previousTestValue" name="previous_test_value" step="any" inputmode="decimal" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="previousTestUnit">Unit</label>
+                            <input type="text" id="previousTestUnit" name="previous_test_unit" maxlength="30" autocomplete="off" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="previousReferenceRange">Reference range <span class="field-hint">Optional</span></label>
+                            <input type="text" id="previousReferenceRange" name="previous_reference_range" maxlength="100" placeholder="For example, 3.5–5.0 mmol/L" autocomplete="off">
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="report-panel">
+                        <legend class="visually-hidden">Latest Report</legend>
+                        <h3 aria-hidden="true">Latest Report</h3>
+                        <div class="comparison-field">
+                            <label for="latestReportDate">Report date</label>
+                            <input type="date" id="latestReportDate" name="latest_report_date" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="latestTestName">Test name</label>
+                            <input type="text" id="latestTestName" name="latest_test_name" maxlength="100" autocomplete="off" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="latestTestValue">Numeric test value</label>
+                            <input type="number" id="latestTestValue" name="latest_test_value" step="any" inputmode="decimal" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="latestTestUnit">Unit</label>
+                            <input type="text" id="latestTestUnit" name="latest_test_unit" maxlength="30" autocomplete="off" required>
+                        </div>
+                        <div class="comparison-field">
+                            <label for="latestReferenceRange">Reference range <span class="field-hint">Optional</span></label>
+                            <input type="text" id="latestReferenceRange" name="latest_reference_range" maxlength="100" placeholder="For example, 3.5–5.0 mmol/L" autocomplete="off">
+                        </div>
+                    </fieldset>
+                </div>
+
+                <div class="comparison-actions">
+                    <button type="submit">Compare Reports</button>
+                    <span class="comparison-note">Use the same test and unit for both entries.</span>
+                </div>
+            </form>
+            <div id="comparisonResult" class="comparison-result" role="status" aria-live="polite" hidden></div>
+        </section>
+
         <section id="result" class="card result-card" aria-labelledby="result-title" aria-live="polite" hidden>
             <div class="result-heading">
                 <span class="heading-icon" aria-hidden="true">
@@ -1208,6 +1433,16 @@
         const resultSubtitle = document.querySelector('.result-heading p');
         const symptomsInput = document.getElementById('symptoms');
         const testResultsInput = document.getElementById('testResults');
+        const comparisonForm = document.getElementById('comparisonForm');
+        const previousReportDate = document.getElementById('previousReportDate');
+        const latestReportDate = document.getElementById('latestReportDate');
+        const comparisonResult = document.getElementById('comparisonResult');
+        const comparisonRequiredTextFields = [
+            ['previousTestName', 'Previous Report test name'],
+            ['previousTestUnit', 'Previous Report unit'],
+            ['latestTestName', 'Latest Report test name'],
+            ['latestTestUnit', 'Latest Report unit'],
+        ].map(([id, label]) => ({ input: document.getElementById(id), label }));
         const symptomsError = document.getElementById('symptoms-error');
         const testResultsError = document.getElementById('test-results-error');
         const symptomsCounter = document.getElementById('symptoms-counter');
@@ -1283,6 +1518,201 @@
         });
         updateCharacterCounter(symptomsInput, symptomsCounter, maxSymptomsLength);
         updateCharacterCounter(testResultsInput, testResultsCounter, maxTestResultsLength);
+
+        function validateReportDates() {
+            previousReportDate.setCustomValidity('');
+            if (
+                previousReportDate.value
+                && latestReportDate.value
+                && previousReportDate.value >= latestReportDate.value
+            ) {
+                previousReportDate.setCustomValidity(
+                    'Previous Report date must be earlier than Latest Report date.',
+                );
+            }
+        }
+
+        function validateComparisonTextFields() {
+            comparisonRequiredTextFields.forEach(({ input, label }) => {
+                input.setCustomValidity(
+                    input.value.trim() ? '' : `${label} must not be empty or whitespace.`,
+                );
+            });
+        }
+
+        comparisonRequiredTextFields.forEach(({ input }) => {
+            input.addEventListener('input', validateComparisonTextFields);
+        });
+        previousReportDate.addEventListener('input', validateReportDates);
+        latestReportDate.addEventListener('input', validateReportDates);
+        comparisonForm.addEventListener('input', () => {
+            comparisonResult.hidden = true;
+        });
+
+        comparisonForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            validateReportDates();
+            validateComparisonTextFields();
+            if (!comparisonForm.reportValidity()) return;
+
+            const previousReport = {
+                date: document.getElementById('previousReportDate').value,
+                testName: document.getElementById('previousTestName').value.trim(),
+                value: document.getElementById('previousTestValue').valueAsNumber,
+                unit: document.getElementById('previousTestUnit').value.trim(),
+                referenceRange: document.getElementById('previousReferenceRange').value.trim(),
+            };
+            const latestReport = {
+                date: document.getElementById('latestReportDate').value,
+                testName: document.getElementById('latestTestName').value.trim(),
+                value: document.getElementById('latestTestValue').valueAsNumber,
+                unit: document.getElementById('latestTestUnit').value.trim(),
+                referenceRange: document.getElementById('latestReferenceRange').value.trim(),
+            };
+
+            const comparison = compareMedicalReports(previousReport, latestReport);
+            renderComparisonResult(previousReport, latestReport, comparison);
+        });
+
+        function compareMedicalReports(previousReport, latestReport) {
+            if (
+                !previousReport.date
+                || !latestReport.date
+                || previousReport.date >= latestReport.date
+                || !previousReport.testName.trim()
+                || !latestReport.testName.trim()
+                || !previousReport.unit.trim()
+                || !latestReport.unit.trim()
+                || !Number.isFinite(previousReport.value)
+                || !Number.isFinite(latestReport.value)
+            ) {
+                return {
+                    valid: false,
+                    comparable: false,
+                    message: 'Enter valid report dates, test names, numeric values, and units before comparing.',
+                };
+            }
+
+            if (
+                previousReport.testName.trim().toLowerCase()
+                !== latestReport.testName.trim().toLowerCase()
+            ) {
+                return {
+                    valid: true,
+                    comparable: false,
+                    message: 'Different tests cannot be directly compared. Enter matching test names to calculate a change.',
+                };
+            }
+
+            if (previousReport.unit.trim() !== latestReport.unit.trim()) {
+                return {
+                    valid: true,
+                    comparable: false,
+                    message: 'The units differ, so no change was calculated. Compatible units are required for comparison.',
+                };
+            }
+
+            const absoluteChange = latestReport.value - previousReport.value;
+            return {
+                valid: true,
+                comparable: true,
+                absoluteChange,
+                percentageChange: previousReport.value === 0
+                    ? null
+                    : (absoluteChange / Math.abs(previousReport.value)) * 100,
+            };
+        }
+
+        function appendComparisonCell(row, value, isHeader = false) {
+            const cell = document.createElement(isHeader ? 'th' : 'td');
+            if (isHeader) cell.scope = 'col';
+            cell.textContent = value;
+            row.appendChild(cell);
+        }
+
+        function formatComparisonValue(value) {
+            return new Intl.NumberFormat(undefined, {
+                maximumSignificantDigits: 12,
+            }).format(value);
+        }
+
+        function renderComparisonResult(previousReport, latestReport, comparison) {
+            comparisonResult.replaceChildren();
+
+            const heading = document.createElement('h3');
+            heading.textContent = 'Report comparison';
+            comparisonResult.appendChild(heading);
+
+            if (!comparison.valid) {
+                const message = document.createElement('p');
+                message.textContent = comparison.message;
+                comparisonResult.appendChild(message);
+                comparisonResult.hidden = false;
+                return;
+            }
+
+            const tableWrap = document.createElement('div');
+            tableWrap.className = 'comparison-table-wrap';
+            const table = document.createElement('table');
+            table.className = 'comparison-table';
+            const header = document.createElement('tr');
+            ['Report', 'Date', 'Test', 'Value', 'Unit', 'Reference range'].forEach(
+                (label) => appendComparisonCell(header, label, true),
+            );
+            const tableHead = document.createElement('thead');
+            tableHead.appendChild(header);
+            table.appendChild(tableHead);
+
+            const tableBody = document.createElement('tbody');
+            [
+                ['Previous Report', previousReport],
+                ['Latest Report', latestReport],
+            ].forEach(([label, report]) => {
+                const row = document.createElement('tr');
+                appendComparisonCell(row, label);
+                appendComparisonCell(row, report.date);
+                appendComparisonCell(row, report.testName);
+                appendComparisonCell(row, formatComparisonValue(report.value));
+                appendComparisonCell(row, report.unit);
+                appendComparisonCell(row, report.referenceRange || 'Not provided');
+                tableBody.appendChild(row);
+            });
+            table.appendChild(tableBody);
+            tableWrap.appendChild(table);
+            comparisonResult.appendChild(tableWrap);
+
+            const summary = document.createElement('p');
+            if (!comparison.comparable) {
+                summary.textContent = comparison.message;
+            } else {
+                summary.textContent = 'Values are shown as entered; no unit conversion has been applied.';
+            }
+            comparisonResult.appendChild(summary);
+
+            if (comparison.comparable) {
+                const changes = document.createElement('ul');
+                changes.className = 'comparison-changes';
+
+                const absoluteChange = document.createElement('li');
+                absoluteChange.textContent =
+                    `Absolute change: ${formatComparisonValue(comparison.absoluteChange)} ${previousReport.unit}`;
+                changes.appendChild(absoluteChange);
+
+                const percentageChange = document.createElement('li');
+                percentageChange.textContent = comparison.percentageChange === null
+                    ? 'Percentage change: undefined because the previous value is zero.'
+                    : `Percentage change: ${formatComparisonValue(comparison.percentageChange)}%`;
+                changes.appendChild(percentageChange);
+                comparisonResult.appendChild(changes);
+            }
+
+            const disclaimer = document.createElement('p');
+            disclaimer.className = 'comparison-disclaimer';
+            disclaimer.textContent =
+                'Numeric changes alone do not establish clinical significance. Discuss results with a qualified healthcare professional.';
+            comparisonResult.appendChild(disclaimer);
+            comparisonResult.hidden = false;
+        }
 
         function getApiErrorMessage(detail) {
             if (typeof detail === 'string') return detail;
