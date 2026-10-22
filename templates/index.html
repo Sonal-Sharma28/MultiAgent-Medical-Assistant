@@ -301,6 +301,16 @@
             font-weight: 450;
         }
 
+        .field-error {
+            margin: 7px 0 0;
+            color: var(--danger);
+            font-size: 0.84rem;
+        }
+
+        .field-error[hidden] {
+            display: none;
+        }
+
         textarea {
             display: block;
             width: 100%;
@@ -887,7 +897,7 @@
                     </div>
                 </div>
 
-                <form id="diagnosisForm">
+                <form id="diagnosisForm" novalidate>
                     <div class="form-group">
                         <label for="symptoms">
                             <span>Symptoms</span>
@@ -897,11 +907,13 @@
                             id="symptoms"
                             name="symptoms"
                             rows="5"
+                            data-max-length="{{ max_symptoms_length }}"
                             placeholder="Describe what you’re experiencing, when it started, how often it happens, and anything that makes it better or worse."
-                            aria-describedby="symptoms-hint"
+                            aria-describedby="symptoms-hint symptoms-error"
                             required
                         ></textarea>
-                        <span id="symptoms-hint" class="field-hint">Avoid including your name or other personal identifying details.</span>
+                        <span id="symptoms-hint" class="field-hint">Maximum {{ max_symptoms_length }} characters. Avoid including your name or other personal identifying details.</span>
+                        <p id="symptoms-error" class="field-error" role="alert" hidden></p>
                     </div>
 
                     <div class="form-group">
@@ -913,8 +925,11 @@
                             id="testResults"
                             name="test_results"
                             rows="4"
+                            data-max-length="{{ max_test_results_length }}"
                             placeholder="Add relevant lab values, measurements, or report text, including units and reference ranges when available."
+                            aria-describedby="test-results-error"
                         ></textarea>
+                        <p id="test-results-error" class="field-error" role="alert" hidden></p>
                     </div>
 
                     <div class="demo-example">
@@ -1053,14 +1068,19 @@
         const resultSubtitle = document.querySelector('.result-heading p');
         const symptomsInput = document.getElementById('symptoms');
         const testResultsInput = document.getElementById('testResults');
+        const symptomsError = document.getElementById('symptoms-error');
+        const testResultsError = document.getElementById('test-results-error');
         const loadDemoButton = document.getElementById('loadDemoButton');
         const historyList = document.getElementById('historyList');
         const historyEmpty = document.getElementById('historyEmpty');
         const historyMessage = document.getElementById('historyMessage');
         const clearHistoryButton = document.getElementById('clearHistoryButton');
         const historyStorageKey = 'mediassist-recent-analyses';
+        const maxSymptomsLength = Number(symptomsInput.dataset.maxLength);
+        const maxTestResultsLength = Number(testResultsInput.dataset.maxLength);
         let analyses = loadAnalyses();
         let currentAnalysis = null;
+        let isSubmitting = false;
 
         function isSavedAnalysis(value) {
             return value !== null
@@ -1075,6 +1095,44 @@
 
         function setHistoryMessage(message) {
             historyMessage.textContent = message;
+        }
+
+        function getFieldError(input, maxLength, label, required) {
+            const value = input.value.trim();
+            if (required && value.length === 0) {
+                return 'Please enter your symptoms before continuing.';
+            }
+            if (Array.from(value).length > maxLength) {
+                return `${label} must be ${maxLength.toLocaleString()} characters or fewer.`;
+            }
+            return '';
+        }
+
+        function updateFieldError(input, messageElement, maxLength, label, required) {
+            const message = getFieldError(input, maxLength, label, required);
+            messageElement.textContent = message;
+            messageElement.hidden = message.length === 0;
+            input.setAttribute('aria-invalid', String(message.length > 0));
+            return message;
+        }
+
+        symptomsInput.addEventListener('input', () => {
+            updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
+        });
+        testResultsInput.addEventListener('input', () => {
+            updateFieldError(testResultsInput, testResultsError, maxTestResultsLength, 'Test results', false);
+        });
+
+        function getApiErrorMessage(detail) {
+            if (typeof detail === 'string') return detail;
+            if (Array.isArray(detail)) {
+                return detail.map((error) => {
+                    const field = Array.isArray(error.loc) ? error.loc.at(-1) : '';
+                    const label = field === 'symptoms' ? 'Symptoms' : field === 'test_results' ? 'Test results' : '';
+                    return label ? `${label}: ${error.msg}` : error.msg;
+                }).filter(Boolean).join(' ');
+            }
+            return 'The analysis could not be completed. Please try again.';
         }
 
         function loadAnalyses() {
@@ -1253,6 +1311,8 @@
         loadDemoButton.addEventListener('click', () => {
             symptomsInput.value = 'Fictional demo: An imaginary adult has had a mild headache and felt tired since yesterday. No other details are provided.';
             testResultsInput.value = 'Fictional demo values only: temperature 36.8 °C; sample result A: 4.2 units (example reference interval 3.5–5.0 units). These values are invented and are not from a real person or medical case.';
+            updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
+            updateFieldError(testResultsInput, testResultsError, maxTestResultsLength, 'Test results', false);
             symptomsInput.focus();
         });
 
@@ -1367,6 +1427,8 @@
 
             symptomsInput.value = analysis.symptoms;
             testResultsInput.value = analysis.testResults;
+            updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
+            updateFieldError(testResultsInput, testResultsError, maxTestResultsLength, 'Test results', false);
             currentAnalysis = analysis;
             renderMarkdownResult(analysis.response, resultContent);
             loadingMessage.hidden = true;
@@ -1397,8 +1459,31 @@
         diagnosisForm.addEventListener('submit', async (event) => {
             event.preventDefault();
 
-            const submittedSymptoms = symptomsInput.value;
-            const submittedTestResults = testResultsInput.value;
+            if (isSubmitting) return;
+
+            const symptomsValidation = updateFieldError(
+                symptomsInput,
+                symptomsError,
+                maxSymptomsLength,
+                'Symptoms',
+                true,
+            );
+            const testResultsValidation = updateFieldError(
+                testResultsInput,
+                testResultsError,
+                maxTestResultsLength,
+                'Test results',
+                false,
+            );
+            if (symptomsValidation || testResultsValidation) {
+                if (symptomsValidation) symptomsInput.focus();
+                else testResultsInput.focus();
+                return;
+            }
+
+            const submittedSymptoms = symptomsInput.value.trim();
+            const submittedTestResults = testResultsInput.value.trim();
+            isSubmitting = true;
             analyzeButton.disabled = true;
             buttonLabel.textContent = 'Reviewing…';
             resultContainer.hidden = false;
@@ -1427,7 +1512,7 @@
 
                 const data = await response.json();
                 if (!response.ok) {
-                    throw new Error(data.detail || 'The analysis could not be completed. Please try again.');
+                    throw new Error(getApiErrorMessage(data.detail));
                 }
 
                 if (typeof data.result !== 'string') {
@@ -1455,6 +1540,7 @@
                     : 'Unable to complete the analysis. Please check your connection and try again.';
                 errorMessage.hidden = false;
             } finally {
+                isSubmitting = false;
                 loadingMessage.hidden = true;
                 analyzeButton.disabled = false;
                 buttonLabel.textContent = 'Review information';
