@@ -1,148 +1,93 @@
-# Multi-Agent-Med-System
- 
-# Medical Diagnosis AI Assistant
+# MediAssist AI
 
-An intelligent medical diagnosis system that leverages AI agents powered by Google's Gemini to assist in medical diagnosis processes. The system combines multiple specialized AI agents working together through CrewAI, with a modern web interface built using FastAPI.
+MediAssist AI is an educational health-information web app. It combines a sequential CrewAI workflow with a browser interface to help users organize reported symptoms and test results for discussion with a qualified healthcare professional.
 
-## 🌟 Features
+> This app does not diagnose or replace professional medical care.
 
-- **Multi-Agent Diagnosis System**
-  - Symptom Analysis Agent
-  - Test Interpretation Agent
-  - Diagnosis Specialist Agent
-  - Treatment Planning Agent
+## Features
 
-- **Modern Web Interface**
-  - Responsive design
-  - Real-time interaction
-  - User-friendly interface
+- **Multi-agent analysis:** CrewAI agents review symptoms, interpret provided test results, consider possible explanations, and offer general care guidance.
+- **Live workflow progress:** Displays agent and task lifecycle events while an analysis runs.
+- **Voice symptom entry:** Uses browser speech recognition when available. English, Hindi, or Marathi recognition is selected from browser language preferences; speech language is not automatically detected.
+- **Response translation:** Translates a completed English response into Hindi or Marathi using the configured Gemini model.
+- **Medical report comparison:** Compares dates, values, and units for matching tests and calculates absolute and percentage changes in the browser.
+- **Convenience and accessibility:** Recent analyses are saved in browser local storage; responses can be copied or downloaded. The interface also includes Markdown formatting and light/dark themes.
 
-- **Powered by Advanced AI**
-  - Google Gemini AI integration
-  - CrewAI framework for agent collaboration
-  - Efficient task delegation and processing
+## Technology
 
-    ![image](https://github.com/user-attachments/assets/1557a841-b118-4de8-82eb-923d7c541b3c)
+- Python 3.11
+- FastAPI and Uvicorn
+- CrewAI with its LiteLLM extra
+- Google Gemini via CrewAI's LLM interface
+- Jinja2 templates, HTML, CSS, and vanilla JavaScript
 
+## Getting started (Windows PowerShell)
 
-## 🔧 Technical Stack
+### Prerequisites
 
-- **Backend**
-  - FastAPI
-  - Python 3.9+
-  - CrewAI
-  - Google Generative AI (Gemini)
+- Python 3.11 and `pip`
+- A Google API key accepted by the configured Gemini provider
 
-- **Frontend**
-  - HTML5
-  - CSS3
-  - JavaScript
+### 1. Clone the repository and create a virtual environment
 
-## 📋 Prerequisites
-
-- Python 3.9 or higher
-- Google Gemini API key
-- Basic understanding of medical terminology (for use)
-
-## ⚙️ Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/medical-diagnosis-ai.git
-cd medical-diagnosis-ai
-```
-
-2. Create and activate a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install required packages:
-```bash
+```powershell
+git clone https://github.com/Sonal-Sharma28/MultiAgent-Medical-Assistant.git
+cd MultiAgent-Medical-Assistant
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-4. Create a `.env` file in the root directory:
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
+If PowerShell prevents virtual-environment activation, allow scripts for this session and activate again:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
 ```
 
-## 🚀 Usage
+### 2. Configure the API key
 
-1. Start the FastAPI server:
-```bash
-uvicorn main:app --reload
+The application reads `GOOGLE_API_KEY` from the environment. Create a `.env` file in the project root and add your own key:
+
+```dotenv
+GOOGLE_API_KEY=replace_with_your_google_api_key
 ```
 
-2. Open your browser and navigate to:
-```
-http://localhost:8000
+Do not commit or share your `.env` file.
+
+### 3. Run the application
+
+```powershell
+python -m uvicorn main:app --reload
 ```
 
-3. Enter patient symptoms and follow the interface prompts for diagnosis.
+Open <http://127.0.0.1:8000/> in your browser. The interactive API documentation is available at <http://127.0.0.1:8000/docs>.
 
-## 📁 Project Structure
+### Run tests
 
+```powershell
+python -m unittest discover -s tests -v
 ```
-medical-diagnosis-ai/
-├── app/
-│   ├── main.py           # FastAPI application
-│   ├── agents.py         # AI agents configuration
-│   └── utils.py          # Utility functions
-├── static/
-│   ├── css/             # Stylesheets
-│   └── js/              # JavaScript files
+
+## Project structure
+
+```text
+.
+├── agents.py             # CrewAI agent roles and Gemini model configuration
+├── crew.py               # Sequential CrewAI workflow
+├── main.py               # FastAPI application and API endpoints
+├── tasks.py              # CrewAI task definitions
+├── workflow_progress.py  # Request-scoped workflow event capture
 ├── templates/
-│   └── index.html       # Main web interface
-├── requirements.txt
-└── README.md
+│   └── index.html        # Application UI, styles, and browser-side behavior
+├── static/               # Legacy static assets
+├── tests/                # Automated tests
+└── requirements.txt      # Python dependencies
 ```
 
-## 🔄 API Endpoints
+## Limitations and medical disclaimer
 
-- `GET /`: Main web interface
-- `POST /analyze`: Submit symptoms for analysis
-- `GET /status`: Check system status
-- `POST /diagnosis`: Get final diagnosis
-- `POST /treatment`: Get treatment plan
+MediAssist AI provides general educational information, not a medical diagnosis or a substitute for advice, diagnosis, or treatment from a qualified healthcare professional. Contact local emergency services if you may be experiencing an emergency.
 
-## ⚠️ Rate Limits
-
-Using Gemini's free tier with the following limits:
-- 15 requests per minute (RPM)
-- 1 million tokens per minute (TPM)
-- 1,500 requests per day (RPD)
-
-## 🛡️ Disclaimer
-
-This system is designed to assist medical professionals and should not be used as a replacement for professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare providers.
-
-## 🔒 Security
-
-- API key protection
-- Rate limiting implementation
-- Input validation and sanitization
-- Secure HTTPS communication
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- Google Generative AI team for Gemini
-- CrewAI framework developers
-- FastAPI development team
-
-
-
-
+AI-generated analysis and machine translations can be incomplete or inaccurate; review them with a qualified professional. Speech recognition depends on browser support, permissions, and available recognition services. The app selects one recognition locale from browser preferences and does not identify the spoken language automatically.
