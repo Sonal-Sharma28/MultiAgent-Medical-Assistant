@@ -529,6 +529,115 @@
             margin-bottom: 0;
         }
 
+        .history-card {
+            margin-top: 22px;
+            padding: clamp(22px, 4vw, 32px);
+        }
+
+        .history-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .history-heading h2 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .history-heading p {
+            margin: 3px 0 0;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .history-clear,
+        .history-delete {
+            min-height: 38px;
+            padding: 0 13px;
+            border: 1px solid var(--line);
+            background: var(--surface);
+            color: var(--ink);
+            font-size: 0.84rem;
+        }
+
+        .history-clear:hover:not(:disabled),
+        .history-delete:hover:not(:disabled) {
+            border-color: var(--danger);
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+
+        .history-clear:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .history-empty,
+        .history-message {
+            margin: 0;
+            padding: 15px;
+            border: 1px solid var(--result-border);
+            border-radius: 10px;
+            background: var(--result-surface);
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .history-message:not(:empty) {
+            margin-top: 12px;
+        }
+
+        .history-list {
+            display: grid;
+            gap: 10px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: stretch;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid var(--result-border);
+            border-radius: 12px;
+            background: var(--result-surface);
+        }
+
+        .history-open {
+            display: grid;
+            min-width: 0;
+            flex: 1;
+            justify-items: start;
+            gap: 3px;
+            padding: 6px 8px;
+            background: transparent;
+            color: var(--ink);
+            text-align: left;
+        }
+
+        .history-open:hover:not(:disabled) {
+            background: var(--blue-soft);
+            color: var(--ink);
+        }
+
+        .history-open strong {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .history-open span {
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-weight: 400;
+        }
+
         .loading-message,
         .error-message {
             margin: 0 0 16px;
@@ -790,6 +899,21 @@
             <p id="errorMessage" class="error-message" role="alert" hidden></p>
             <div id="resultContent" class="result-content" hidden></div>
         </section>
+
+        <section class="card history-card" aria-labelledby="history-title">
+            <div class="history-heading">
+                <div>
+                    <h2 id="history-title">Recent Analyses</h2>
+                    <p>Saved only in this browser on this device.</p>
+                </div>
+                <button type="button" id="clearHistoryButton" class="history-clear" disabled>
+                    Clear history
+                </button>
+            </div>
+            <p id="historyEmpty" class="history-empty">Your completed analyses will appear here.</p>
+            <ul id="historyList" class="history-list" aria-label="Saved analyses" hidden></ul>
+            <p id="historyMessage" class="history-message" role="status" aria-live="polite"></p>
+        </section>
     </main>
 
     <footer class="site-footer">
@@ -834,6 +958,136 @@
         const loadingMessage = document.getElementById('loadingMessage');
         const errorMessage = document.getElementById('errorMessage');
         const resultContent = document.getElementById('resultContent');
+        const resultSubtitle = document.querySelector('.result-heading p');
+        const symptomsInput = document.getElementById('symptoms');
+        const testResultsInput = document.getElementById('testResults');
+        const historyList = document.getElementById('historyList');
+        const historyEmpty = document.getElementById('historyEmpty');
+        const historyMessage = document.getElementById('historyMessage');
+        const clearHistoryButton = document.getElementById('clearHistoryButton');
+        const historyStorageKey = 'mediassist-recent-analyses';
+        let analyses = loadAnalyses();
+
+        function isSavedAnalysis(value) {
+            return value !== null
+                && typeof value === 'object'
+                && typeof value.id === 'string'
+                && typeof value.symptoms === 'string'
+                && typeof value.testResults === 'string'
+                && typeof value.response === 'string'
+                && typeof value.timestamp === 'string'
+                && Number.isFinite(Date.parse(value.timestamp));
+        }
+
+        function setHistoryMessage(message) {
+            historyMessage.textContent = message;
+        }
+
+        function loadAnalyses() {
+            let saved;
+            try {
+                saved = localStorage.getItem(historyStorageKey);
+            } catch (error) {
+                setHistoryMessage('Browser storage is unavailable. Analyses cannot be saved on this device.');
+                return [];
+            }
+
+            if (saved === null) return [];
+
+            let parsed;
+            try {
+                parsed = JSON.parse(saved);
+            } catch (error) {
+                try {
+                    localStorage.removeItem(historyStorageKey);
+                } catch (removeError) {
+                    // The invalid data is ignored even if browser storage cannot be cleared.
+                }
+                setHistoryMessage('Saved history was unreadable and has been reset.');
+                return [];
+            }
+
+            if (!Array.isArray(parsed)) {
+                try {
+                    localStorage.removeItem(historyStorageKey);
+                } catch (error) {
+                    // The invalid data is ignored even if browser storage cannot be cleared.
+                }
+                setHistoryMessage('Saved history was invalid and has been reset.');
+                return [];
+            }
+
+            const validAnalyses = parsed.filter(isSavedAnalysis);
+            if (validAnalyses.length !== parsed.length) {
+                try {
+                    localStorage.setItem(historyStorageKey, JSON.stringify(validAnalyses));
+                    setHistoryMessage('Some invalid saved entries were removed.');
+                } catch (error) {
+                    setHistoryMessage('Some saved entries were invalid and have been skipped.');
+                }
+            }
+            return validAnalyses;
+        }
+
+        function saveAnalyses(nextAnalyses, successMessage) {
+            analyses = nextAnalyses;
+            renderHistory();
+            try {
+                localStorage.setItem(historyStorageKey, JSON.stringify(analyses));
+                setHistoryMessage(successMessage);
+            } catch (error) {
+                setHistoryMessage('This change is visible until you leave the page, but could not be saved in browser storage.');
+            }
+        }
+
+        function formatTimestamp(timestamp) {
+            return new Intl.DateTimeFormat(undefined, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            }).format(new Date(timestamp));
+        }
+
+        function renderHistory() {
+            historyList.replaceChildren();
+            historyEmpty.hidden = analyses.length > 0;
+            historyList.hidden = analyses.length === 0;
+            clearHistoryButton.disabled = analyses.length === 0;
+
+            for (const analysis of analyses) {
+                const item = document.createElement('li');
+                item.className = 'history-item';
+
+                const openButton = document.createElement('button');
+                openButton.type = 'button';
+                openButton.className = 'history-open';
+                openButton.dataset.action = 'open';
+                openButton.dataset.id = analysis.id;
+
+                const summary = document.createElement('strong');
+                const symptomSummary = analysis.symptoms.replace(/\s+/g, ' ').trim();
+                summary.textContent = symptomSummary.length > 72
+                    ? `${symptomSummary.slice(0, 72)}…`
+                    : symptomSummary || 'Analysis';
+
+                const date = formatTimestamp(analysis.timestamp);
+                const details = document.createElement('span');
+                details.textContent = `${date}${analysis.testResults ? ' · Test results included' : ''}`;
+                openButton.append(summary, details);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'history-delete';
+                deleteButton.textContent = 'Delete';
+                deleteButton.dataset.action = 'delete';
+                deleteButton.dataset.id = analysis.id;
+                deleteButton.setAttribute('aria-label', `Delete analysis from ${date}`);
+
+                item.append(openButton, deleteButton);
+                historyList.appendChild(item);
+            }
+        }
+
+        renderHistory();
 
         function appendInlineMarkdown(parent, text) {
             const inlinePattern = /(\*\*.+?\*\*|__.+?__|`[^`]+`|\*[^*\n]+\*)/g;
@@ -929,15 +1183,57 @@
             flushParagraph();
         }
 
+        historyList.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (!button) return;
+
+            const analysis = analyses.find((entry) => entry.id === button.dataset.id);
+            if (!analysis) return;
+
+            if (button.dataset.action === 'delete') {
+                saveAnalyses(
+                    analyses.filter((entry) => entry.id !== analysis.id),
+                    'Analysis deleted from history.',
+                );
+                return;
+            }
+
+            symptomsInput.value = analysis.symptoms;
+            testResultsInput.value = analysis.testResults;
+            renderMarkdownResult(analysis.response, resultContent);
+            loadingMessage.hidden = true;
+            errorMessage.hidden = true;
+            resultContent.hidden = false;
+            resultContainer.hidden = false;
+            resultSubtitle.textContent = `Saved analysis from ${formatTimestamp(analysis.timestamp)}. Review this information with a qualified healthcare professional.`;
+            resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        clearHistoryButton.addEventListener('click', () => {
+            if (analyses.length === 0 || !window.confirm('Clear all saved analyses from this browser?')) return;
+
+            analyses = [];
+            renderHistory();
+            try {
+                localStorage.removeItem(historyStorageKey);
+                setHistoryMessage('All saved analyses were cleared.');
+            } catch (error) {
+                setHistoryMessage('History was cleared for this page, but browser storage could not be updated.');
+            }
+        });
+
         diagnosisForm.addEventListener('submit', async (event) => {
             event.preventDefault();
 
+            const submittedSymptoms = symptomsInput.value;
+            const submittedTestResults = testResultsInput.value;
             analyzeButton.disabled = true;
             buttonLabel.textContent = 'Reviewing…';
             resultContainer.hidden = false;
             loadingMessage.hidden = false;
             errorMessage.hidden = true;
             resultContent.hidden = true;
+            resultSubtitle.textContent = 'Review this information with a qualified healthcare professional.';
             errorMessage.textContent = '';
             resultContent.textContent = '';
 
@@ -948,8 +1244,8 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        symptoms: document.getElementById('symptoms').value,
-                        test_results: document.getElementById('testResults').value,
+                        symptoms: submittedSymptoms,
+                        test_results: submittedTestResults,
                     }),
                 });
 
@@ -964,6 +1260,17 @@
 
                 renderMarkdownResult(data.result, resultContent);
                 resultContent.hidden = false;
+                resultSubtitle.textContent = 'Review this information with a qualified healthcare professional.';
+                const analysis = {
+                    id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+                        ? crypto.randomUUID()
+                        : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                    symptoms: submittedSymptoms,
+                    testResults: submittedTestResults,
+                    response: data.result,
+                    timestamp: new Date().toISOString(),
+                };
+                saveAnalyses([analysis, ...analyses], 'Analysis saved to recent history.');
             } catch (error) {
                 errorMessage.textContent = error instanceof Error
                     ? `Unable to complete the analysis: ${error.message}`
