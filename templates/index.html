@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f3f8fc">
-    <title>MediAssist AI | Educational Health Information</title>
+    <title>MediAssist AI </title>
     <script>
         try {
             const savedTheme = localStorage.getItem('mediassist-theme');
@@ -451,10 +451,82 @@
             border-radius: 12px;
             background: var(--result-surface);
             color: var(--result-text);
-            font: inherit;
             line-height: 1.75;
             overflow-wrap: anywhere;
+        }
+
+        .result-content h1,
+        .result-content h2,
+        .result-content h3,
+        .result-content h4,
+        .result-content h5,
+        .result-content h6 {
+            margin: 1.15em 0 0.45em;
+            color: var(--ink);
+            line-height: 1.35;
+        }
+
+        .result-content h1 {
+            font-size: 1.45rem;
+        }
+
+        .result-content h2 {
+            font-size: 1.3rem;
+        }
+
+        .result-content h3 {
+            font-size: 1.15rem;
+        }
+
+        .result-content h4,
+        .result-content h5,
+        .result-content h6 {
+            font-size: 1rem;
+        }
+
+        .result-content p {
+            margin: 0.55em 0;
             white-space: pre-wrap;
+        }
+
+        .result-content ul,
+        .result-content ol {
+            margin: 0.55em 0;
+            padding-left: 1.6rem;
+        }
+
+        .result-content li {
+            padding-left: 0.2rem;
+        }
+
+        .result-content li + li {
+            margin-top: 0.25em;
+        }
+
+        .result-content li::marker,
+        .result-content strong {
+            color: var(--teal);
+        }
+
+        .result-content em {
+            font-style: italic;
+        }
+
+        .result-content code {
+            padding: 0.1em 0.35em;
+            border-radius: 4px;
+            background: var(--blue-soft);
+            color: var(--ink);
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 0.92em;
+        }
+
+        .result-content > :first-child {
+            margin-top: 0;
+        }
+
+        .result-content > :last-child {
+            margin-bottom: 0;
         }
 
         .loading-message,
@@ -716,7 +788,7 @@
                 <span>Reviewing your information. Please wait…</span>
             </p>
             <p id="errorMessage" class="error-message" role="alert" hidden></p>
-            <pre id="resultContent" class="result-content" hidden></pre>
+            <div id="resultContent" class="result-content" hidden></div>
         </section>
     </main>
 
@@ -763,6 +835,100 @@
         const errorMessage = document.getElementById('errorMessage');
         const resultContent = document.getElementById('resultContent');
 
+        function appendInlineMarkdown(parent, text) {
+            const inlinePattern = /(\*\*.+?\*\*|__.+?__|`[^`]+`|\*[^*\n]+\*)/g;
+            let lastIndex = 0;
+
+            for (const match of text.matchAll(inlinePattern)) {
+                const token = match[0];
+                const start = match.index;
+                if (start > lastIndex) {
+                    parent.appendChild(document.createTextNode(text.slice(lastIndex, start)));
+                }
+
+                const isCode = token.startsWith('`');
+                const isBold = token.startsWith('**') || token.startsWith('__');
+                const markerLength = isCode || isBold ? 2 : 1;
+                const element = document.createElement(isCode ? 'code' : isBold ? 'strong' : 'em');
+                element.textContent = token.slice(markerLength, -markerLength);
+                parent.appendChild(element);
+                lastIndex = start + token.length;
+            }
+
+            if (lastIndex < text.length) {
+                parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+            }
+        }
+
+        function renderMarkdownResult(markdown, container) {
+            container.replaceChildren();
+
+            const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+            let paragraphLines = [];
+            let listElement = null;
+            let listType = null;
+
+            function flushParagraph() {
+                if (paragraphLines.length === 0) return;
+
+                const paragraph = document.createElement('p');
+                appendInlineMarkdown(paragraph, paragraphLines.join(' '));
+                container.appendChild(paragraph);
+                paragraphLines = [];
+            }
+
+            function flushList() {
+                listElement = null;
+                listType = null;
+            }
+
+            for (const line of lines) {
+                const headingMatch = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+                const unorderedMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+                const orderedMatch = line.match(/^\s*(\d+)[.)]\s+(.+)$/);
+
+                if (line.trim() === '') {
+                    flushParagraph();
+                    flushList();
+                    continue;
+                }
+
+                if (headingMatch) {
+                    flushParagraph();
+                    flushList();
+
+                    const heading = document.createElement(`h${headingMatch[1].length}`);
+                    appendInlineMarkdown(heading, headingMatch[2]);
+                    container.appendChild(heading);
+                    continue;
+                }
+
+                if (unorderedMatch || orderedMatch) {
+                    flushParagraph();
+                    const nextListType = orderedMatch ? 'ol' : 'ul';
+                    if (listType !== nextListType) {
+                        flushList();
+                        listType = nextListType;
+                        listElement = document.createElement(nextListType);
+                        if (orderedMatch && Number(orderedMatch[1]) !== 1) {
+                            listElement.start = Number(orderedMatch[1]);
+                        }
+                        container.appendChild(listElement);
+                    }
+
+                    const item = document.createElement('li');
+                    appendInlineMarkdown(item, orderedMatch ? orderedMatch[2] : unorderedMatch[1]);
+                    listElement.appendChild(item);
+                    continue;
+                }
+
+                flushList();
+                paragraphLines.push(line.trim());
+            }
+
+            flushParagraph();
+        }
+
         diagnosisForm.addEventListener('submit', async (event) => {
             event.preventDefault();
 
@@ -796,7 +962,7 @@
                     throw new Error('The response did not include a readable result. Please try again.');
                 }
 
-                resultContent.textContent = data.result;
+                renderMarkdownResult(data.result, resultContent);
                 resultContent.hidden = false;
             } catch (error) {
                 errorMessage.textContent = error instanceof Error

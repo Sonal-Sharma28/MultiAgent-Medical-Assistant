@@ -1,18 +1,108 @@
-// script.js
-document.getElementById('diagnosisForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
+function appendInlineMarkdown(parent, text) {
+    const pattern = /(\*\*.+?\*\*|__.+?__|`[^`]+`|\*[^*\n]+\*)/g;
+    let lastIndex = 0;
+
+    for (const match of text.matchAll(pattern)) {
+        const token = match[0];
+        const start = match.index;
+        parent.appendChild(document.createTextNode(text.slice(lastIndex, start)));
+
+        const isCode = token.startsWith('`');
+        const isBold = token.startsWith('**') || token.startsWith('__');
+        const markerLength = isCode || isBold ? 2 : 1;
+        const element = document.createElement(isCode ? 'code' : isBold ? 'strong' : 'em');
+        element.textContent = token.slice(markerLength, -markerLength);
+        parent.appendChild(element);
+        lastIndex = start + token.length;
+    }
+
+    parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+}
+
+function renderMarkdownResult(markdown, container) {
+    container.replaceChildren();
+
+    const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+    let paragraphLines = [];
+    let listElement = null;
+    let listType = null;
+
+    function flushParagraph() {
+        if (paragraphLines.length === 0) return;
+
+        const paragraph = document.createElement('p');
+        appendInlineMarkdown(paragraph, paragraphLines.join(' '));
+        container.appendChild(paragraph);
+        paragraphLines = [];
+    }
+
+    function flushList() {
+        listElement = null;
+        listType = null;
+    }
+
+    for (const line of lines) {
+        const headingMatch = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
+        const unorderedMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+        const orderedMatch = line.match(/^\s*(\d+)[.)]\s+(.+)$/);
+
+        if (line.trim() === '') {
+            flushParagraph();
+            flushList();
+            continue;
+        }
+
+        if (headingMatch) {
+            flushParagraph();
+            flushList();
+
+            const heading = document.createElement(`h${headingMatch[1].length}`);
+            appendInlineMarkdown(heading, headingMatch[2]);
+            container.appendChild(heading);
+            continue;
+        }
+
+        if (unorderedMatch || orderedMatch) {
+            flushParagraph();
+            const nextListType = orderedMatch ? 'ol' : 'ul';
+            if (listType !== nextListType) {
+                flushList();
+                listType = nextListType;
+                listElement = document.createElement(nextListType);
+                if (orderedMatch && Number(orderedMatch[1]) !== 1) {
+                    listElement.start = Number(orderedMatch[1]);
+                }
+                container.appendChild(listElement);
+            }
+
+            const item = document.createElement('li');
+            appendInlineMarkdown(item, orderedMatch ? orderedMatch[2] : unorderedMatch[1]);
+            listElement.appendChild(item);
+            continue;
+        }
+
+        flushList();
+        paragraphLines.push(line.trim());
+    }
+
+    flushParagraph();
+}
+
+document.getElementById('diagnosisForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+
     const button = document.getElementById('analyzeButton');
-    button.disabled = true;
-    button.textContent = 'Analyzing...';
-    
     const resultContainer = document.getElementById('result');
     const resultContent = document.getElementById('resultContent');
-    
-    // Show loading state
-    resultContent.innerHTML = '<div class="loading">Analyzing patient data...</div>';
+    button.disabled = true;
+    button.textContent = 'Analyzing...';
+    resultContent.replaceChildren();
+    const loadingMessage = document.createElement('div');
+    loadingMessage.className = 'loading';
+    loadingMessage.textContent = 'Analyzing patient data...';
+    resultContent.appendChild(loadingMessage);
     resultContainer.style.display = 'block';
-    
+
     try {
         const response = await fetch('http://127.0.0.1:8000/api/analyze', {
             method: 'POST',
@@ -23,58 +113,31 @@ document.getElementById('diagnosisForm').addEventListener('submit', async (e) =>
             body: JSON.stringify({
                 symptoms: document.getElementById('symptoms').value,
                 test_results: document.getElementById('testResults').value,
-                medical_history: document.getElementById('medicalHistory').value
+                medical_history: document.getElementById('medicalHistory')?.value ?? ''
             }),
         });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Analysis failed. Please try again.');
-        }
-        
+
         const data = await response.json();
-        
-        // Format the result in a more readable way
-        const formattedResult = formatMedicalResult(data.result);
-        resultContent.innerHTML = formattedResult;
-        resultContainer.style.display = 'block';
+        if (!response.ok) {
+            throw new Error(data.detail || 'Analysis failed. Please try again.');
+        }
+
+        const result = typeof data.result === 'string'
+            ? data.result
+            : data.result?.task_output || data.result?.treatment_plan;
+        if (typeof result !== 'string') {
+            throw new Error('The response did not include a readable result.');
+        }
+
+        renderMarkdownResult(result, resultContent);
     } catch (error) {
-        resultContent.innerHTML = `<p class="error">Error: ${error.message}</p>`;
-        resultContainer.style.display = 'block';
+        resultContent.replaceChildren();
+        const errorMessage = document.createElement('p');
+        errorMessage.className = 'error';
+        errorMessage.textContent = `Error: ${error instanceof Error ? error.message : 'Analysis failed. Please try again.'}`;
+        resultContent.appendChild(errorMessage);
     } finally {
         button.disabled = false;
         button.textContent = 'Analyze';
     }
 });
-
-function formatMedicalResult(result) {
-    // Extract the treatment plan summary from the result
-    let treatmentPlan = '';
-    try {
-        // The result might be a string or an object containing the treatment plan
-        if (typeof result === 'string') {
-            treatmentPlan = result;
-        } else if (result.task_output) {
-            treatmentPlan = result.task_output;
-        } else if (result.treatment_plan) {
-            treatmentPlan = result.treatment_plan;
-        }
-        
-        // Clean up the text and format it
-        treatmentPlan = treatmentPlan
-            .replace(/\n/g, '<br>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>');
-            
-        return `
-            <div class="treatment-summary">
-                <div class="treatment-content">
-                    ${treatmentPlan}
-                </div>
-            </div>
-        `;
-    } catch (error) {
-        console.error('Error formatting result:', error);
-        return `<p class="error">Error formatting the treatment plan. Raw result: ${JSON.stringify(result)}</p>`;
-    }
-}

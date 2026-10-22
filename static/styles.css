@@ -77,6 +77,26 @@ button:disabled {
     color: #2c5282;
 }
 
+.treatment-content h1,
+.treatment-content h2,
+.treatment-content h3,
+.treatment-content h4,
+.treatment-content h5,
+.treatment-content h6 {
+    margin: 1.15em 0 0.45em;
+    line-height: 1.35;
+}
+
+.treatment-content ul,
+.treatment-content ol {
+    margin: 0.55em 0;
+    padding-left: 1.6rem;
+}
+
+.treatment-content li + li {
+    margin-top: 0.25em;
+}
+
 .loading {
     text-align: center;
     color: #666;
