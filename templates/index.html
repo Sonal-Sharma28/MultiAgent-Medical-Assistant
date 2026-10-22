@@ -215,15 +215,6 @@
             text-align: center;
         }
 
-        .eyebrow {
-            margin: 0 0 8px;
-            color: var(--blue);
-            font-size: 0.76rem;
-            font-weight: 750;
-            letter-spacing: 0.13em;
-            text-transform: uppercase;
-        }
-
         .intro h1 {
             margin: 0;
             font-size: clamp(2rem, 4vw, 2.8rem);
@@ -361,12 +352,6 @@
             color: var(--danger);
         }
 
-        .speech-language-note {
-            margin: 6px 0 0;
-            color: var(--muted);
-            font-size: 0.76rem;
-        }
-
         textarea {
             display: block;
             width: 100%;
@@ -464,11 +449,6 @@
             border-color: var(--blue);
             background: var(--blue-soft);
             color: var(--ink);
-        }
-
-        .demo-note {
-            color: var(--muted);
-            font-size: 0.8rem;
         }
 
         .side-column {
@@ -1301,33 +1281,6 @@
             max-width: 680px;
         }
 
-        .intro-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin: 0 0 15px;
-            color: var(--teal);
-            font-size: 0.76rem;
-            font-weight: 750;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .intro-badge::before {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--teal);
-            content: "";
-        }
-
-        .eyebrow {
-            margin-bottom: 10px;
-            color: var(--blue);
-            font-size: 0.73rem;
-            letter-spacing: 0.12em;
-        }
-
         .intro h1 {
             max-width: 650px;
             color: var(--ink);
@@ -2056,8 +2009,6 @@
     <main class="page-shell">
         <section class="intro" aria-labelledby="page-title">
             <div class="intro-copy">
-                <p class="intro-badge">Educational health information</p>
-                <p class="eyebrow">A clearer view of your health information</p>
                 <h1 id="page-title">Make sense of your health information.</h1>
                 <p>Describe what you’re experiencing and add any available test results. Get a structured educational summary to help prepare for a conversation with a healthcare professional.</p>
             </div>
@@ -2084,7 +2035,6 @@
                     </span>
                     <div>
                         <h2 id="form-title">Share your information</h2>
-                        <p>Include what you know; test results are optional.</p>
                     </div>
                 </div>
 
@@ -2116,7 +2066,6 @@
                             </button>
                         </div>
                         <p id="speechStatus" class="speech-status" role="status" aria-live="polite"></p>
-                        <p class="speech-language-note">Voice input uses one language based on your browser preference. The browser does not automatically detect whether you are speaking English, Hindi, or Marathi.</p>
                     </div>
 
                     <div class="form-group">
@@ -2138,7 +2087,6 @@
 
                     <div class="demo-example">
                         <button type="button" id="loadDemoButton" class="demo-button">Load Demo Example</button>
-                        <span class="demo-note">Fictional sample data for demonstration only; not a real patient or case.</span>
                     </div>
 
                     <div class="form-actions">
