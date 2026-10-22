@@ -449,6 +449,7 @@
         }
 
         .result-card[hidden],
+        .result-actions[hidden],
         .loading-message[hidden],
         .error-message[hidden] {
             display: none;
@@ -555,6 +556,38 @@
 
         .result-content > :last-child {
             margin-bottom: 0;
+        }
+
+        .result-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .copy-response {
+            min-height: 38px;
+            padding: 0 13px;
+            border: 1px solid var(--line);
+            background: var(--surface);
+            color: var(--ink);
+            font-size: 0.84rem;
+        }
+
+        .copy-response:hover:not(:disabled) {
+            border-color: var(--teal);
+            background: var(--blue-soft);
+            color: var(--ink);
+        }
+
+        .copy-message {
+            color: var(--teal);
+            font-size: 0.84rem;
+        }
+
+        .copy-message[data-state="error"] {
+            color: var(--danger);
         }
 
         .history-card {
@@ -931,6 +964,10 @@
             </p>
             <p id="errorMessage" class="error-message" role="alert" hidden></p>
             <div id="resultContent" class="result-content" hidden></div>
+            <div id="resultActions" class="result-actions" hidden>
+                <button type="button" id="copyResponseButton" class="copy-response">Copy Response</button>
+                <span id="copyMessage" class="copy-message" role="status" aria-live="polite"></span>
+            </div>
         </section>
 
         <section class="card history-card" aria-labelledby="history-title">
@@ -991,6 +1028,9 @@
         const loadingMessage = document.getElementById('loadingMessage');
         const errorMessage = document.getElementById('errorMessage');
         const resultContent = document.getElementById('resultContent');
+        const resultActions = document.getElementById('resultActions');
+        const copyResponseButton = document.getElementById('copyResponseButton');
+        const copyMessage = document.getElementById('copyMessage');
         const resultSubtitle = document.querySelector('.result-heading p');
         const symptomsInput = document.getElementById('symptoms');
         const testResultsInput = document.getElementById('testResults');
@@ -1121,6 +1161,44 @@
             }
         }
 
+        function getReadableResponse(container) {
+            return Array.from(container.children).map((element) => {
+                const tagName = element.tagName.toLowerCase();
+
+                if (tagName === 'ul') {
+                    return Array.from(element.children)
+                        .map((item) => `• ${item.textContent.trim()}`)
+                        .join('\n');
+                }
+
+                if (tagName === 'ol') {
+                    const firstNumber = element.start || 1;
+                    return Array.from(element.children)
+                        .map((item, index) => `${firstNumber + index}. ${item.textContent.trim()}`)
+                        .join('\n');
+                }
+
+                return element.textContent.trim();
+            }).filter(Boolean).join('\n\n');
+        }
+
+        copyResponseButton.addEventListener('click', async () => {
+            const responseText = getReadableResponse(resultContent);
+            copyMessage.textContent = '';
+            copyMessage.dataset.state = '';
+
+            try {
+                if (!navigator.clipboard?.writeText) {
+                    throw new Error('Clipboard access is unavailable.');
+                }
+                await navigator.clipboard.writeText(responseText);
+                copyMessage.textContent = 'Response copied!';
+            } catch (error) {
+                copyMessage.dataset.state = 'error';
+                copyMessage.textContent = 'Unable to copy response. Check clipboard permissions and try again.';
+            }
+        });
+
         renderHistory();
 
         loadDemoButton.addEventListener('click', () => {
@@ -1244,6 +1322,9 @@
             loadingMessage.hidden = true;
             errorMessage.hidden = true;
             resultContent.hidden = false;
+            resultActions.hidden = false;
+            copyMessage.textContent = '';
+            copyMessage.dataset.state = '';
             resultContainer.hidden = false;
             resultSubtitle.textContent = `Saved analysis from ${formatTimestamp(analysis.timestamp)}. Review this information with a qualified healthcare professional.`;
             resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1273,6 +1354,9 @@
             loadingMessage.hidden = false;
             errorMessage.hidden = true;
             resultContent.hidden = true;
+            resultActions.hidden = true;
+            copyMessage.textContent = '';
+            copyMessage.dataset.state = '';
             resultSubtitle.textContent = 'Review this information with a qualified healthcare professional.';
             errorMessage.textContent = '';
             resultContent.textContent = '';
@@ -1300,6 +1384,7 @@
 
                 renderMarkdownResult(data.result, resultContent);
                 resultContent.hidden = false;
+                resultActions.hidden = false;
                 resultSubtitle.textContent = 'Review this information with a qualified healthcare professional.';
                 const analysis = {
                     id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
