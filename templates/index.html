@@ -590,6 +590,21 @@
             color: var(--danger);
         }
 
+        .download-report {
+            min-height: 38px;
+            padding: 0 13px;
+            border: 1px solid var(--line);
+            background: var(--surface);
+            color: var(--ink);
+            font-size: 0.84rem;
+        }
+
+        .download-report:hover:not(:disabled) {
+            border-color: var(--teal);
+            background: var(--blue-soft);
+            color: var(--ink);
+        }
+
         .history-card {
             margin-top: 22px;
             padding: clamp(22px, 4vw, 32px);
@@ -967,6 +982,8 @@
             <div id="resultActions" class="result-actions" hidden>
                 <button type="button" id="copyResponseButton" class="copy-response">Copy Response</button>
                 <span id="copyMessage" class="copy-message" role="status" aria-live="polite"></span>
+                <button type="button" id="downloadReportButton" class="download-report">Download Report</button>
+                <span id="downloadMessage" class="copy-message" role="status" aria-live="polite"></span>
             </div>
         </section>
 
@@ -1031,6 +1048,8 @@
         const resultActions = document.getElementById('resultActions');
         const copyResponseButton = document.getElementById('copyResponseButton');
         const copyMessage = document.getElementById('copyMessage');
+        const downloadReportButton = document.getElementById('downloadReportButton');
+        const downloadMessage = document.getElementById('downloadMessage');
         const resultSubtitle = document.querySelector('.result-heading p');
         const symptomsInput = document.getElementById('symptoms');
         const testResultsInput = document.getElementById('testResults');
@@ -1041,6 +1060,7 @@
         const clearHistoryButton = document.getElementById('clearHistoryButton');
         const historyStorageKey = 'mediassist-recent-analyses';
         let analyses = loadAnalyses();
+        let currentAnalysis = null;
 
         function isSavedAnalysis(value) {
             return value !== null
@@ -1199,6 +1219,35 @@
             }
         });
 
+        downloadReportButton.addEventListener('click', () => {
+            if (!currentAnalysis) return;
+
+            const report = [
+                'MEDICAL ANALYSIS REPORT',
+                `Analysis date and time: ${formatTimestamp(currentAnalysis.timestamp)}`,
+                '',
+                'SYMPTOMS',
+                currentAnalysis.symptoms,
+                '',
+                'TEST RESULTS',
+                currentAnalysis.testResults || 'Not provided.',
+                '',
+                'AI RESPONSE',
+                getReadableResponse(resultContent),
+                '',
+            ].join('\n');
+            const reportDate = new Date(currentAnalysis.timestamp).toISOString().slice(0, 10);
+            const downloadUrl = URL.createObjectURL(new Blob([report], { type: 'text/plain;charset=utf-8' }));
+            const downloadLink = document.createElement('a');
+            downloadLink.href = downloadUrl;
+            downloadLink.download = `medical-analysis-${reportDate}.txt`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+            downloadMessage.textContent = 'Report downloaded.';
+        });
+
         renderHistory();
 
         loadDemoButton.addEventListener('click', () => {
@@ -1318,6 +1367,7 @@
 
             symptomsInput.value = analysis.symptoms;
             testResultsInput.value = analysis.testResults;
+            currentAnalysis = analysis;
             renderMarkdownResult(analysis.response, resultContent);
             loadingMessage.hidden = true;
             errorMessage.hidden = true;
@@ -1325,6 +1375,7 @@
             resultActions.hidden = false;
             copyMessage.textContent = '';
             copyMessage.dataset.state = '';
+            downloadMessage.textContent = '';
             resultContainer.hidden = false;
             resultSubtitle.textContent = `Saved analysis from ${formatTimestamp(analysis.timestamp)}. Review this information with a qualified healthcare professional.`;
             resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1357,6 +1408,7 @@
             resultActions.hidden = true;
             copyMessage.textContent = '';
             copyMessage.dataset.state = '';
+            downloadMessage.textContent = '';
             resultSubtitle.textContent = 'Review this information with a qualified healthcare professional.';
             errorMessage.textContent = '';
             resultContent.textContent = '';
@@ -1395,6 +1447,7 @@
                     response: data.result,
                     timestamp: new Date().toISOString(),
                 };
+                currentAnalysis = analysis;
                 saveAnalyses([analysis, ...analyses], 'Analysis saved to recent history.');
             } catch (error) {
                 errorMessage.textContent = error instanceof Error
