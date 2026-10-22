@@ -377,6 +377,34 @@
             font-size: 0.82rem;
         }
 
+        .demo-example {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+            margin: -3px 0 20px;
+        }
+
+        .demo-button {
+            min-height: 38px;
+            padding: 0 13px;
+            border: 1px solid var(--line);
+            background: var(--blue-soft);
+            color: var(--ink);
+            font-size: 0.84rem;
+        }
+
+        .demo-button:hover:not(:disabled) {
+            border-color: var(--blue);
+            background: var(--blue-soft);
+            color: var(--ink);
+        }
+
+        .demo-note {
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
         .side-column {
             display: grid;
             gap: 16px;
@@ -841,6 +869,11 @@
                         ></textarea>
                     </div>
 
+                    <div class="demo-example">
+                        <button type="button" id="loadDemoButton" class="demo-button">Load Demo Example</button>
+                        <span class="demo-note">Fictional sample data for demonstration only; not a real patient or case.</span>
+                    </div>
+
                     <div class="form-actions">
                         <button type="submit" id="analyzeButton">
                             <span class="button-content">
@@ -961,6 +994,7 @@
         const resultSubtitle = document.querySelector('.result-heading p');
         const symptomsInput = document.getElementById('symptoms');
         const testResultsInput = document.getElementById('testResults');
+        const loadDemoButton = document.getElementById('loadDemoButton');
         const historyList = document.getElementById('historyList');
         const historyEmpty = document.getElementById('historyEmpty');
         const historyMessage = document.getElementById('historyMessage');
@@ -1088,6 +1122,12 @@
         }
 
         renderHistory();
+
+        loadDemoButton.addEventListener('click', () => {
+            symptomsInput.value = 'Fictional demo: An imaginary adult has had a mild headache and felt tired since yesterday. No other details are provided.';
+            testResultsInput.value = 'Fictional demo values only: temperature 36.8 °C; sample result A: 4.2 units (example reference interval 3.5–5.0 units). These values are invented and are not from a real person or medical case.';
+            symptomsInput.focus();
+        });
 
         function appendInlineMarkdown(parent, text) {
             const inlinePattern = /(\*\*.+?\*\*|__.+?__|`[^`]+`|\*[^*\n]+\*)/g;
