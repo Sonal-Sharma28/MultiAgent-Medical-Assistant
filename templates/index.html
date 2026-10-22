@@ -324,6 +324,39 @@
             font-weight: 650;
         }
 
+        .speech-controls {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 12px;
+        }
+
+        .speech-button {
+            min-height: 42px;
+            padding: 0 14px;
+            white-space: nowrap;
+        }
+
+        .speech-button[data-recording="true"] {
+            background: var(--danger);
+        }
+
+        .speech-status {
+            min-height: 1.35em;
+            margin: 7px 0 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .speech-status[data-state="error"] {
+            color: var(--danger);
+        }
+
+        .speech-language-note {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.76rem;
+        }
+
         textarea {
             display: block;
             width: 100%;
@@ -736,6 +769,47 @@
             margin-top: 12px;
         }
 
+        .response-language-control {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-right: auto;
+        }
+
+        .response-language-control label {
+            font-size: 0.84rem;
+            font-weight: 650;
+        }
+
+        .response-language-control select {
+            min-height: 38px;
+            padding: 0 10px;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: var(--field-surface);
+            color: var(--ink);
+            font: inherit;
+            font-size: 0.84rem;
+        }
+
+        .response-language-control select:focus-visible {
+            outline: 3px solid var(--focus-ring);
+            outline-offset: 2px;
+        }
+
+        .translation-message,
+        .translation-note {
+            flex-basis: 100%;
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
+        .translation-message[data-state="error"] {
+            color: var(--danger);
+        }
+
         .copy-response {
             min-height: 38px;
             padding: 0 13px;
@@ -1070,6 +1144,10 @@
             .form-actions button {
                 width: 100%;
             }
+
+            .speech-button {
+                width: 100%;
+            }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -1161,12 +1239,23 @@
                             rows="5"
                             data-max-length="{{ max_symptoms_length }}"
                             placeholder="Describe what you’re experiencing, when it started, how often it happens, and anything that makes it better or worse."
-                            aria-describedby="symptoms-hint symptoms-error symptoms-counter"
+                            aria-describedby="symptoms-hint symptoms-error symptoms-counter speechStatus"
                             required
                         ></textarea>
                         <span id="symptoms-hint" class="field-hint">Maximum {{ max_symptoms_length }} characters. Avoid including your name or other personal identifying details.</span>
                         <p id="symptoms-error" class="field-error" role="alert" hidden></p>
                         <span id="symptoms-counter" class="character-counter" aria-live="polite" aria-atomic="true"></span>
+                        <div class="speech-controls">
+                            <button type="button" id="speechButton" class="speech-button" aria-pressed="false" aria-describedby="speechStatus">
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <rect x="9" y="3" width="6" height="12" rx="3" stroke="currentColor" stroke-width="1.8"/>
+                                    <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-3 0h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                </svg>
+                                <span id="speechButtonLabel">Start voice input</span>
+                            </button>
+                        </div>
+                        <p id="speechStatus" class="speech-status" role="status" aria-live="polite"></p>
+                        <p class="speech-language-note">Voice input uses one language based on your browser preference. The browser does not automatically detect whether you are speaking English, Hindi, or Marathi.</p>
                     </div>
 
                     <div class="form-group">
@@ -1357,6 +1446,16 @@
             <p id="errorMessage" class="error-message" role="alert" hidden></p>
             <div id="resultContent" class="result-content" hidden></div>
             <div id="resultActions" class="result-actions" hidden>
+                <div class="response-language-control">
+                    <label for="responseLanguage">Response language</label>
+                    <select id="responseLanguage" name="response_language" aria-describedby="translationNote translationMessage">
+                        <option value="en" selected>English</option>
+                        <option value="hi">Hindi (हिन्दी)</option>
+                        <option value="mr">Marathi (मराठी)</option>
+                    </select>
+                    <span id="translationMessage" class="translation-message" role="status" aria-live="polite"></span>
+                    <p id="translationNote" class="translation-note">Machine translation may be imperfect. The saved analysis remains in English.</p>
+                </div>
                 <button type="button" id="copyResponseButton" class="copy-response">Copy Response</button>
                 <span id="copyMessage" class="copy-message" role="status" aria-live="polite"></span>
                 <button type="button" id="downloadReportButton" class="download-report">Download Report</button>
@@ -1430,8 +1529,14 @@
         const copyMessage = document.getElementById('copyMessage');
         const downloadReportButton = document.getElementById('downloadReportButton');
         const downloadMessage = document.getElementById('downloadMessage');
+        const responseLanguageSelect = document.getElementById('responseLanguage');
+        const translationMessage = document.getElementById('translationMessage');
         const resultSubtitle = document.querySelector('.result-heading p');
         const symptomsInput = document.getElementById('symptoms');
+        const speechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const speechButton = document.getElementById('speechButton');
+        const speechButtonLabel = document.getElementById('speechButtonLabel');
+        const speechStatus = document.getElementById('speechStatus');
         const testResultsInput = document.getElementById('testResults');
         const comparisonForm = document.getElementById('comparisonForm');
         const previousReportDate = document.getElementById('previousReportDate');
@@ -1467,6 +1572,13 @@
         let analyses = loadAnalyses();
         let currentAnalysis = null;
         let isSubmitting = false;
+        let activeSpeechRecognition = null;
+        let translationRequestId = 0;
+        let translatedResponses = new Map();
+        let speechStopRequested = false;
+        let speechStopReason = '';
+        let speechEndMessage = '';
+        let speechReceivedFinalResult = false;
 
         function isSavedAnalysis(value) {
             return value !== null
@@ -1507,6 +1619,243 @@
             counter.textContent = `${characterCount.toLocaleString()} / ${maxLength.toLocaleString()} characters`;
             counter.dataset.limitReached = String(characterCount >= maxLength);
         }
+
+        function getSpeechRecognitionLanguage(preferredLanguages) {
+            const languageTags = Array.isArray(preferredLanguages)
+                ? preferredLanguages
+                : [];
+            for (const languageTag of languageTags) {
+                if (typeof languageTag !== 'string') continue;
+                const language = languageTag.toLowerCase().split('-')[0];
+                if (language === 'hi') return 'hi-IN';
+                if (language === 'mr') return 'mr-IN';
+                if (language === 'en') return 'en-IN';
+            }
+            return 'en-IN';
+        }
+
+        function appendVoiceTranscript(existingText, transcript, maxLength) {
+            const spokenText = transcript.trim();
+            if (!spokenText) {
+                return { value: existingText, appended: '', truncated: false };
+            }
+
+            const separator = existingText && !/\s$/.test(existingText) ? ' ' : '';
+            const remainingCharacters = Math.max(
+                0,
+                maxLength - Array.from(existingText).length - separator.length,
+            );
+            const transcriptCharacters = Array.from(spokenText);
+            const appended = transcriptCharacters.slice(0, remainingCharacters).join('');
+
+            return {
+                value: existingText + (appended ? separator + appended : ''),
+                appended,
+                truncated: Array.from(appended).length < transcriptCharacters.length,
+            };
+        }
+
+        function setSpeechStatus(message, state = '') {
+            speechStatus.textContent = message;
+            speechStatus.dataset.state = state;
+        }
+
+        function updateSpeechControls(isRecording) {
+            speechButtonLabel.textContent = isRecording ? 'Stop listening' : 'Start voice input';
+            speechButton.setAttribute('aria-pressed', String(isRecording));
+            speechButton.dataset.recording = String(isRecording);
+            speechButton.disabled = !speechRecognitionConstructor;
+        }
+
+        function getSpeechErrorMessage(errorCode) {
+            const messages = {
+                'not-allowed': 'Microphone permission was denied. Allow microphone access in your browser settings and try again.',
+                'service-not-allowed': 'Speech recognition is not allowed by the browser. Check its microphone and speech settings.',
+                'audio-capture': 'No microphone was found. Connect or enable a microphone and try again.',
+                'no-speech': 'No speech was detected. Check your microphone and try again.',
+                network: 'Speech recognition could not connect. Check your connection and try again.',
+                'language-not-supported': 'Speech recognition does not support the selected language in this browser.',
+            };
+            return messages[errorCode] || 'Speech recognition stopped unexpectedly. Please try again.';
+        }
+
+        function stopSpeechRecognition(reason = 'manual') {
+            const recognition = activeSpeechRecognition;
+            if (!recognition) return;
+
+            speechStopRequested = true;
+            speechStopReason = reason;
+            if (reason === 'manual') {
+                speechEndMessage = speechReceivedFinalResult
+                    ? 'Recording stopped. Review your transcription before submitting.'
+                    : 'Recording stopped. No speech was detected.';
+            } else if (reason === 'form') {
+                speechEndMessage = 'Voice input stopped. Review your transcription, then submit the analysis.';
+            } else if (reason === 'limit') {
+                speechEndMessage = 'The transcription reached the symptoms character limit.';
+            }
+
+            try {
+                recognition.stop();
+            } catch (error) {
+                if (activeSpeechRecognition === recognition) {
+                    activeSpeechRecognition = null;
+                    updateSpeechControls(false);
+                }
+                if (reason !== 'navigation') {
+                    setSpeechStatus('Unable to stop speech recognition. You can continue editing the symptoms manually.', 'error');
+                }
+            }
+        }
+
+        function startSpeechRecognition() {
+            if (!speechRecognitionConstructor) {
+                speechButton.disabled = true;
+                setSpeechStatus('Speech recognition is not supported in this browser. You can type your symptoms instead.', 'error');
+                return;
+            }
+            if (activeSpeechRecognition || isSubmitting) return;
+
+            let recognition;
+            try {
+                recognition = new speechRecognitionConstructor();
+            } catch (error) {
+                setSpeechStatus('Speech recognition could not be started. You can type your symptoms instead.', 'error');
+                return;
+            }
+
+            const preferredLanguages = navigator.languages?.length
+                ? navigator.languages
+                : [navigator.language];
+            recognition.lang = getSpeechRecognitionLanguage(preferredLanguages);
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            speechStopRequested = false;
+            speechStopReason = '';
+            speechEndMessage = '';
+            speechReceivedFinalResult = false;
+            activeSpeechRecognition = recognition;
+            updateSpeechControls(true);
+            setSpeechStatus('Requesting microphone access…');
+
+            recognition.onstart = () => {
+                if (activeSpeechRecognition !== recognition) return;
+                const languageNames = {
+                    'en-IN': 'English (India)',
+                    'hi-IN': 'Hindi (India)',
+                    'mr-IN': 'Marathi (India)',
+                };
+                setSpeechStatus(
+                    `Listening with ${languageNames[recognition.lang]} based on your browser preference. Speech language is not automatically detected.`,
+                );
+            };
+
+            recognition.onresult = (event) => {
+                if (activeSpeechRecognition !== recognition) return;
+
+                const finalTranscripts = [];
+                for (let index = event.resultIndex; index < event.results.length; index += 1) {
+                    const result = event.results[index];
+                    if (result.isFinal && result[0]?.transcript) {
+                        finalTranscripts.push(result[0].transcript);
+                    }
+                }
+                if (finalTranscripts.length === 0) return;
+
+                speechReceivedFinalResult = true;
+                const appendedResult = appendVoiceTranscript(
+                    symptomsInput.value,
+                    finalTranscripts.join(' '),
+                    maxSymptomsLength,
+                );
+                if (appendedResult.appended) {
+                    symptomsInput.value = appendedResult.value;
+                    symptomsInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    symptomsInput.focus();
+                }
+
+                if (appendedResult.truncated) {
+                    speechEndMessage = 'Speech was shortened to fit the symptoms character limit. Review the text before submitting.';
+                    setSpeechStatus(speechEndMessage, 'error');
+                    stopSpeechRecognition('limit');
+                } else if (appendedResult.appended) {
+                    if (speechStopRequested && speechStopReason === 'form') {
+                        speechEndMessage = 'Voice input stopped. Review your transcription, then click Review information again.';
+                        setSpeechStatus(speechEndMessage);
+                    } else if (speechStopRequested && speechStopReason === 'manual') {
+                        speechEndMessage = 'Recording stopped. Review your transcription before submitting.';
+                        setSpeechStatus(speechEndMessage);
+                    } else {
+                        speechEndMessage = '';
+                        setSpeechStatus('Transcription added. Continue speaking or stop to review it.');
+                    }
+                }
+            };
+
+            recognition.onerror = (event) => {
+                if (activeSpeechRecognition !== recognition || event.error === 'aborted') return;
+                speechEndMessage = getSpeechErrorMessage(event.error);
+                setSpeechStatus(speechEndMessage, 'error');
+                speechStopRequested = true;
+                speechStopReason = 'error';
+            };
+
+            recognition.onend = () => {
+                if (activeSpeechRecognition !== recognition) return;
+                activeSpeechRecognition = null;
+                updateSpeechControls(false);
+
+                if (speechEndMessage) {
+                    setSpeechStatus(speechEndMessage, speechStopReason === 'error' || speechStopReason === 'limit' ? 'error' : '');
+                } else if (speechStopRequested && speechStopReason === 'manual') {
+                    setSpeechStatus(speechReceivedFinalResult
+                        ? 'Recording stopped. Review your transcription before submitting.'
+                        : 'Recording stopped. No speech was detected.');
+                } else if (!speechReceivedFinalResult) {
+                    setSpeechStatus('No speech was detected. Check your microphone and try again.', 'error');
+                } else {
+                    setSpeechStatus('Speech recognition ended. Review your transcription before submitting.');
+                }
+            };
+
+            try {
+                recognition.start();
+            } catch (error) {
+                activeSpeechRecognition = null;
+                updateSpeechControls(false);
+                setSpeechStatus(
+                    error.name === 'NotAllowedError' || error.name === 'SecurityError'
+                        ? 'Microphone permission was denied. Allow microphone access in your browser settings and try again.'
+                        : 'Speech recognition could not be started. Check microphone access and try again.',
+                    'error',
+                );
+            }
+        }
+
+        speechButton.addEventListener('click', () => {
+            if (activeSpeechRecognition) {
+                stopSpeechRecognition('manual');
+            } else {
+                startSpeechRecognition();
+            }
+        });
+
+        if (!speechRecognitionConstructor) {
+            speechButton.disabled = true;
+            setSpeechStatus('Speech recognition is not supported in this browser. You can type your symptoms instead.', 'error');
+        }
+
+        diagnosisForm.addEventListener('submit', (event) => {
+            if (!activeSpeechRecognition) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            stopSpeechRecognition('form');
+            setSpeechStatus('Voice input stopped. Review your transcription, then click Review information again.');
+        }, true);
+
+        window.addEventListener('pagehide', () => {
+            stopSpeechRecognition('navigation');
+        });
 
         symptomsInput.addEventListener('input', () => {
             updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
@@ -2004,6 +2353,94 @@
             }).filter(Boolean).join('\n\n');
         }
 
+        async function requestResponseTranslation(originalResponse, language) {
+            const response = await fetch('/api/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    response: originalResponse,
+                    language,
+                }),
+            });
+            if (!response.ok) {
+                throw new Error('Translation is unavailable. The original English response is unchanged.');
+            }
+
+            const data = await response.json();
+            if (typeof data.translation !== 'string' || !data.translation.trim()) {
+                throw new Error('Translation returned no text. The original English response is unchanged.');
+            }
+            return data.translation;
+        }
+
+        async function showSelectedResponseLanguage() {
+            if (!currentAnalysis) return;
+
+            const analysis = currentAnalysis;
+            const language = responseLanguageSelect.value;
+            const requestId = ++translationRequestId;
+            translationMessage.textContent = '';
+            translationMessage.dataset.state = '';
+            copyMessage.textContent = '';
+            copyMessage.dataset.state = '';
+            downloadMessage.textContent = '';
+            responseLanguageSelect.removeAttribute('aria-busy');
+            copyResponseButton.disabled = false;
+            downloadReportButton.disabled = false;
+
+            if (language === 'en') {
+                renderMarkdownResult(analysis.response, resultContent);
+                resultContent.hidden = false;
+                return;
+            }
+
+            const cacheKey = `${analysis.id}:${language}`;
+            if (translatedResponses.has(cacheKey)) {
+                renderMarkdownResult(translatedResponses.get(cacheKey), resultContent);
+                resultContent.hidden = false;
+                return;
+            }
+
+            resultContent.hidden = true;
+            copyResponseButton.disabled = true;
+            downloadReportButton.disabled = true;
+            responseLanguageSelect.setAttribute('aria-busy', 'true');
+            translationMessage.textContent = 'Translating response…';
+
+            try {
+                const translatedResponse = await requestResponseTranslation(
+                    analysis.response,
+                    language,
+                );
+                if (requestId !== translationRequestId || currentAnalysis !== analysis) return;
+
+                translatedResponses.set(cacheKey, translatedResponse);
+                renderMarkdownResult(translatedResponse, resultContent);
+                resultContent.hidden = false;
+                translationMessage.textContent = '';
+            } catch (error) {
+                if (requestId !== translationRequestId || currentAnalysis !== analysis) return;
+
+                responseLanguageSelect.value = 'en';
+                renderMarkdownResult(analysis.response, resultContent);
+                resultContent.hidden = false;
+                translationMessage.dataset.state = 'error';
+                translationMessage.textContent = error instanceof Error
+                    ? error.message
+                    : 'Translation is unavailable. The original English response is unchanged.';
+            } finally {
+                if (requestId === translationRequestId && currentAnalysis === analysis) {
+                    responseLanguageSelect.removeAttribute('aria-busy');
+                    copyResponseButton.disabled = false;
+                    downloadReportButton.disabled = false;
+                }
+            }
+        }
+
+        responseLanguageSelect.addEventListener('change', showSelectedResponseLanguage);
+
         copyResponseButton.addEventListener('click', async () => {
             const responseText = getReadableResponse(resultContent);
             copyMessage.textContent = '';
@@ -2053,6 +2490,7 @@
         renderHistory();
 
         loadDemoButton.addEventListener('click', () => {
+            stopSpeechRecognition('manual');
             symptomsInput.value = 'Fictional demo: An imaginary adult has had a mild headache and felt tired since yesterday. No other details are provided.';
             testResultsInput.value = 'Fictional demo values only: temperature 36.8 °C; sample result A: 4.2 units (example reference interval 3.5–5.0 units). These values are invented and are not from a real person or medical case.';
             updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
@@ -2158,6 +2596,7 @@
 
         historyList.addEventListener('click', (event) => {
             if (isSubmitting) return;
+            stopSpeechRecognition('manual');
 
             const button = event.target.closest('button[data-action]');
             if (!button) return;
@@ -2173,6 +2612,14 @@
                 return;
             }
 
+            translationRequestId += 1;
+            translatedResponses.clear();
+            responseLanguageSelect.value = 'en';
+            responseLanguageSelect.removeAttribute('aria-busy');
+            translationMessage.textContent = '';
+            translationMessage.dataset.state = '';
+            copyResponseButton.disabled = false;
+            downloadReportButton.disabled = false;
             symptomsInput.value = analysis.symptoms;
             testResultsInput.value = analysis.testResults;
             updateFieldError(symptomsInput, symptomsError, maxSymptomsLength, 'Symptoms', true);
@@ -2242,6 +2689,14 @@
             errorMessage.hidden = true;
             resultContent.hidden = true;
             resultActions.hidden = true;
+            translationRequestId += 1;
+            translatedResponses.clear();
+            responseLanguageSelect.value = 'en';
+            responseLanguageSelect.removeAttribute('aria-busy');
+            translationMessage.textContent = '';
+            translationMessage.dataset.state = '';
+            copyResponseButton.disabled = false;
+            downloadReportButton.disabled = false;
             copyMessage.textContent = '';
             copyMessage.dataset.state = '';
             downloadMessage.textContent = '';
@@ -2292,6 +2747,7 @@
                     timestamp: new Date().toISOString(),
                 };
                 currentAnalysis = analysis;
+                responseLanguageSelect.value = 'en';
                 saveAnalyses([analysis, ...analyses], 'Analysis saved to recent history.');
             } catch (error) {
                 workflowProgressMessage.textContent =
